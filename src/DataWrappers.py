@@ -14,7 +14,7 @@ import torch
 from torch.utils.data import Dataset, ConcatDataset
 
 from skimage.morphology import dilation, star
-from PIL import Image
+from PIL import Image, ImageOps
 
 import matplotlib.pyplot as plt
 
