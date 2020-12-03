@@ -107,3 +107,28 @@ class RandomDataset(torch.utils.data.Dataset):
         mask = mask.reshape(1,mask.shape[0],mask.shape[1])
 
         return torch.tensor(image), torch.tensor(mask)
+
+    
+def visualize_dataset(dataset, img_num=6):
+    fig, ax = plt.subplots(2,img_num, figsize = (20,7))
+    i = 0 
+    for x, y in dataset:
+        #print(x.shape, x.float().mean())
+        #print(y.shape, y.float().mean())
+
+        image = torchvision.transforms.functional.to_pil_image(x)
+        outline = torchvision.transforms.functional.to_pil_image(y)
+
+        ax[0,i].imshow(image)
+        ax[1,i].imshow(outline)
+        i += 1
+        if i == img_num: break
+    plt.show()
+
+
+def add_mask(img, mask):
+  img = np.array(img)
+  mask = np.array(mask)
+  img[:,:,0] = mask*255
+  return img
+
