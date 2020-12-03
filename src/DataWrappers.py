@@ -16,6 +16,8 @@ from torch.utils.data import Dataset, ConcatDataset
 from skimage.morphology import dilation, star
 from PIL import Image
 
+import matplotlib.pyplot as plt
+
 class RandomDataset(torch.utils.data.Dataset):
     
     """
