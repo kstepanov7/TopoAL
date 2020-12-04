@@ -4,6 +4,7 @@ from skimage.morphology import binary_dilation, star
 from skimage import io
 from skimage.morphology import skeletonize
 import torch
+import time
 
 
 def make_skeleton(image, sigma = 0.125, tr = 0.1):
@@ -80,21 +81,17 @@ def check_in_paths(paths, point):
                 return True
     return False
 
-def find_path(start_point, patch, paths):
+def find_path(start_point, skel, paths):
 
-    '''
-    Find longest path from the given start_point
-    and crossroads points (with more than 1 neighbor)
-    '''
-
-    if len(find_neighs(patch, start_point)) == 0:
+    if len(find_neighs(skel, start_point)) == 0:
         return [start_point] , []
 
+    start_time = time.time()
     prev_point = start_point
-    point = find_neighs(patch, prev_point)[0]
+    point = find_neighs(skel, prev_point)[0]
     path, cross_points = [start_point, point], []
-    while True:
-        neighs = find_neighs(patch, point)
+    while True and time.time()-start_time < 3:
+        neighs = find_neighs(skel, point)
         for n in neighs:
             if check_in_paths(paths, n) == True:
                 idx = neighs.index(n)
