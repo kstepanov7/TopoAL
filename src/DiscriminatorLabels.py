@@ -251,14 +251,14 @@ def generate_sublabels(labels):
 
     return labels_
 
-def generate_labels(mask_gt, mask_p, sigma=0.5):
+def generate_labels(mask_gt, mask_p, sigma=0.5, tr=0.5):
 
     '''
     Generate labels for discriminator input
     '''
     
     gt_dil = binary_dilation(mask_gt,selem=star(1))
-    skel_gt = make_skeleton(mask_gt, sigma=sigma)
+    skel_gt = make_skeleton(mask_gt, sigma=sigma, tr=tr)
     T_0 = gt_dil * mask_p
 
     labels0 = torch.zeros((8,8))
