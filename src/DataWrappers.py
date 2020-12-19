@@ -19,7 +19,7 @@ from PIL import Image, ImageOps
 
 import matplotlib.pyplot as plt
 
-class RandomDataset(torch.utils.data.Dataset):
+class RandomDataset(Dataset):
     
     """
       Generate Dataset from randomly cropped samples from given images
@@ -71,8 +71,8 @@ class RandomDataset(torch.utils.data.Dataset):
             return image, mask
 
         if self.inv:
-          image = image.resize((int(image.size[0]/3), int(image.size[1] /3)))
-          mask = mask.resize((int(mask.size[0]/3), int(mask.size[1] /3)))
+          image = image.resize((int(image.size[0]/6), int(image.size[1] /6)))
+          mask = mask.resize((int(mask.size[0]/6), int(mask.size[1] /6)))
           mask = ImageOps.invert(mask)
 
         h, w = self.sample_size
@@ -80,8 +80,8 @@ class RandomDataset(torch.utils.data.Dataset):
             image = self.add_border(image)
             mask = self.add_border(mask)
         
-        x_range = max(10, image.size[0] - w)
-        y_range = max(10, image.size[1] - h)
+        x_range = max(1, image.size[0] - w)
+        y_range = max(1, image.size[1] - h)
 
         x = np.random.randint(x_range)
         y = np.random.randint(y_range)
@@ -105,11 +105,11 @@ class RandomDataset(torch.utils.data.Dataset):
         #mask = self.mask_transform(image=np.array(mask,dtype=np.uint8))['image']
         mask[mask != 0] = 1
         if self.preprocessing_fn:
-            image = preprocessing_fn(image)
+            image = self.preprocessing_fn(image)
         image = np.transpose(image, (2,0,1))
         mask = mask.reshape(1,mask.shape[0],mask.shape[1])
 
-        return torch.tensor(image), torch.tensor(mask)
+        return torch.tensor(image).float(), torch.tensor(mask)
 
     
 def visualize_dataset(dataset, img_num=6):
