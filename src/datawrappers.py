@@ -12,7 +12,7 @@ import random
 import numpy as np
 import torch
 import torchvision
-from torch.utils.data import Dataset, ConcatDataset
+from torch.utils.data import Dataset, ConcatDataset, DataLoader
 
 from skimage.morphology import dilation, star
 from PIL import Image, ImageOps
@@ -112,26 +112,25 @@ class RandomDataset(Dataset):
         return torch.tensor(image).float(), torch.tensor(mask)
 
     
-def visualize_dataset(dataset, img_num=6):
-    fig, ax = plt.subplots(2,img_num, figsize = (20,7))
-    i = 0 
-    for x, y in dataset:
-        #print(x.shape, x.float().mean())
-        #print(y.shape, y.float().mean())
+def create_dataloaders(OTT = True, MOS = False, URBN = False,transforms=None, sample_size = (256,256), prep_fn=None, bs=4, dil=None):
 
-        image = torchvision.transforms.functional.to_pil_image(x)
-        outline = torchvision.transforms.functional.to_pil_image(y)
+    train_datasets, val_datasets = [], []
+    if MOS:
+        DATADIR = '/content/drive/My Drive/GeoAlert/TAT+MOS/MOS'
+        train_datasets.append(RandomDataset(f'{DATADIR}/train/images/',f'{DATADIR}/train/masks/', 
+                                    transforms, None,sample_size=sample_size, preprocessing_fn=prep_fn, dil=dil))
+        val_datasets.append(RandomDataset(f'{DATADIR}/val/images/',f'{DATADIR}/val/masks/', 
+                                    transforms, None,sample_size=sample_size, preprocessing_fn=prep_fn, dil=dil))
 
-        ax[0,i].imshow(image)
-        ax[1,i].imshow(outline)
-        i += 1
-        if i == img_num: break
-    plt.show()
+    if OTT:
+        DATADIR = '/content/drive/My Drive/GeoAlert/Ottawa-Dataset'
+        train_datasets.append(RandomDataset(f'{DATADIR}/train/images/',f'{DATADIR}/train/masks/', 
+                                    transforms, None,sample_size=(256,256), inv=True, preprocessing_fn=prep_fn, dil=dil))
+        val_datasets.append(RandomDataset(f'{DATADIR}/val/images/',f'{DATADIR}/val/masks/', 
+                                    transforms, None,sample_size=(256,256), inv=True, preprocessing_fn=prep_fn, dil=dil))
 
+    train_loader = DataLoader(torch.utils.data.ConcatDataset(train_datasets), batch_size=bs, shuffle=True)
+    val_loader = DataLoader(torch.utils.data.ConcatDataset(val_datasets), batch_size=bs, shuffle=True)
 
-def add_mask(img, mask):
-  img = np.array(img)
-  mask = np.array(mask)
-  img[:,:,0] = mask*255
-  return img
+    return train_loader, val_loader
 
