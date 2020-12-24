@@ -6,7 +6,7 @@ from torch import nn
 
 class Loss_D(nn.Module):
     
-    def __init__(self, loss = nn.BCELoss()):
+    def __init__(self, device, loss = nn.BCELoss()):
         super(Loss_D, self).__init__()
         self.Loss = loss
         self.device = device
@@ -16,7 +16,7 @@ class Loss_D(nn.Module):
         loss = 0 
         for i in range(len(pred_D)):
 
-            loss += self.Loss(pred_D[i], labels_D[i].to(device).float()) + torch.mean(torch.sum(-torch.log(pred_xy[i]), (2,3)))
+            loss += self.Loss(pred_D[i], labels_D[i].to(self.device).float()) + torch.mean(torch.sum(-torch.log(pred_xy[i]), (2,3)))
             #loss += (self.BCELoss(pred_D[i].sigmoid(), labels_D[i]))
             
         return loss
