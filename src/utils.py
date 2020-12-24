@@ -30,7 +30,7 @@ class STE(nn.Module):
         return input
 
 
-def Dilation(img, dil=1):
+def Dilation(img, dil=1, device=None):
     bs = img.shape[0]
     img = img.detach().cpu().numpy()
     img_dil = np.zeros_like(img)
@@ -38,7 +38,7 @@ def Dilation(img, dil=1):
     for i in range(bs):
         img_dil[i,0] = binary_dilation(img[i,0],selem=star(dil))
     
-    return torch.tensor(img_dil).to(device)
+    return torch.tensor(img_dil).to(device) if device else torch.tensor(img_dil)
 
     
 def visualize_dataset(dataset, img_num=6):
