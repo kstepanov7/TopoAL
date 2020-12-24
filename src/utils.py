@@ -4,6 +4,7 @@ from torch import nn
 import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
+from skimage.morphology import binary_dilation, star
 
 
 class STE(nn.Module):
