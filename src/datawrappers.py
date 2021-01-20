@@ -137,7 +137,7 @@ class ValDataset(Dataset):
             
         return new_img
 
-    def crop_samples(self, img, channel=None):
+    def crop_samples(self, img):
         
         x_samples = img.size[0]//self.sample_size[0]
         y_samples = img.size[1]//self.sample_size[1]
@@ -147,8 +147,6 @@ class ValDataset(Dataset):
         for i in range(x_samples):
             for j in range(y_samples):
                 sample = np.array(img.crop((i*ss[0], j*ss[0], (i+1)*ss[0], (j+1)*ss[1])))
-                if channel:
-                    sample = sample[:,:,1]
                 samples.append(sample)
 
         return samples
@@ -172,15 +170,7 @@ class ValDataset(Dataset):
             mask = self.add_border(mask)
 
             img_s = self.crop_samples(img)
-            mask_s = self.crop_samples(mask, channel=2)
-
-            if self.transform: 
-                for i in range(len(img_s)):
-                  sample = self.img_transform(image=np.array(img_s[i]), mask=np.array(mask_s[i]))
-                  img_s[i], mask_s[i] = sample['image'], sample['mask']
-
-            if self.preprocess_fn:
-                img_s = [self.preprocess_fn(img) for img in img_s]
+            mask_s = self.crop_samples(mask)
 
             images.extend(img_s)
             masks.extend(mask_s)
@@ -190,8 +180,24 @@ class ValDataset(Dataset):
     def __getitem__(self, idx):
         img = self.images[idx]
         mask = self.masks[idx]
+        if self.transform:
+          
+            seed = 42
+            random.seed(seed)
+            torch.manual_seed(seed)
+            np.random.seed(seed)
 
-        return img, mask
+            sample = self.transform(image=np.array(img), mask=np.array(mask))
+            img, mask = sample['image'], sample['mask']
+
+        if self.preprocess_fn:
+            img = self.preprocess_fn(img)
+        if len(mask.shape) == 3:
+            mask = mask[:,:,1]
+
+        mask[mask > 0] = 1
+        img = img.transpose(2,0,1)
+        return torch.tensor(img).float(), torch.tensor(mask).float()
     
     
 def create_dataloaders(OTT = True, MOS = False, URBN = False,transforms=None, sample_size = (256,256), prep_fn=None, bs=4, dil=None):
