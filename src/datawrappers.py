@@ -197,6 +197,7 @@ class ValDataset(Dataset):
 
         mask[mask > 0] = 1
         img = img.transpose(2,0,1)
+        mask = mask.reshape(1,mask.shape[0],mask.shape[1])
         return torch.tensor(img).float(), torch.tensor(mask).float()
     
     
