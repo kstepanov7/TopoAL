@@ -109,7 +109,7 @@ class DRUNet(nn.Module):
             out_size = 2 ** (layer + 1) * root_filters
             self.up_layers.append(UpSampling(out_size*2, out_size))
 
-        self.conv_out = nn.Conv2d(16,1,3,padding=1)
+        self.conv_out = nn.Conv2d(root_filters*2,1,3,padding=1)
         self.relu = nn.ReLU()
 
     def forward(self, input):
