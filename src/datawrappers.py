@@ -180,6 +180,9 @@ class ValDataset(Dataset):
     def __getitem__(self, idx):
         img = self.images[idx]
         mask = self.masks[idx]
+        if len(mask.shape) == 3:
+            mask = mask[:,:,1]
+
         if self.transform:
           
             seed = 42
@@ -192,13 +195,12 @@ class ValDataset(Dataset):
 
         if self.preprocess_fn:
             img = self.preprocess_fn(img)
-        if len(mask.shape) == 3:
-            mask = mask[:,:,1]
 
         mask[mask > 0] = 1
         img = img.transpose(2,0,1)
         mask = mask.reshape(1,mask.shape[0],mask.shape[1])
         return torch.tensor(img).float(), torch.tensor(mask).float()
+
     
     
 def create_dataloaders(OTT = True, MOS = False, URBN = False,transforms=None, sample_size = (256,256), prep_fn=None, bs=4, dil=None):
