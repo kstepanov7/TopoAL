@@ -21,7 +21,7 @@ def run_epoch(model, optimizer, criterion, dataloader, device, metric=None):
               optimizer.step()
           
           if metric != None:
-              epoch_metric += metric(pred.detach().cpu().numpy(), mask_gt.detach().cpu().numpy())
+              epoch_metric += metric(pred.detach().cpu(), mask_gt.detach().cpu())
     
     if metric != None:
         return epoch_loss/len(dataloader), epoch_metric/len(dataloader)
