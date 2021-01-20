@@ -1,6 +1,19 @@
 import torch
 import torch.nn as nn
 
+class DownSev(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=7, p=0.1):
+        super(DownSev, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=3)
+        self.dropout = nn.Dropout(p=p) if p > 0 else None
+
+    def forward(self, x):
+        out = self.conv(x)
+        if self.dropout:
+            out = self.dropout(out)
+        return out
+
+    
 class DownSampling(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, p=0.1, use_bn=True, use_res=True):
         super(DownSampling, self).__init__()
