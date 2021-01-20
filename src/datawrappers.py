@@ -153,8 +153,8 @@ class ValDataset(Dataset):
 
     def create_samples(self, data_dir):
 
-        img_paths = glob.glob(data_dir+'/images/*.tif')
-        mask_paths = glob.glob(data_dir+'/masks/*.png')
+        img_paths = sorted(glob.glob(data_dir+'/images/*.tif'))
+        mask_paths = sorted(glob.glob(data_dir+'/masks/*.png'))
 
         images, masks = [], []
         for img_path, mask_path in zip(img_paths, mask_paths):
