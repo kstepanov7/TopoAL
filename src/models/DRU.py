@@ -1,18 +1,6 @@
 import torch
 import torch.nn as nn
 
-class DownSev(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=7, p=0.1):
-        super(DownSev, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=3)
-        self.dropout = nn.Dropout(p=p) if p > 0 else None
-
-    def forward(self, x):
-        out = self.conv(x)
-        if self.dropout:
-            out = self.dropout(out)
-        return out
-
 class DownSampling(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, p=0.1, use_bn=True, use_res=True):
         super(DownSampling, self).__init__()
@@ -46,13 +34,15 @@ class DownSampling(nn.Module):
 
 
 class UpSampling(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=2, kernel=3, padding=1, p=0.1, use_bn=True, use_res=True):
+    def __init__(self, in_channels, out_channels, cat_channels=None, stride=2, kernel=3, padding=1, p=0.1, use_bn=True, use_res=True):
         super(UpSampling, self).__init__()
         
-        self.deconv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=stride, padding=0)
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=kernel, padding=padding)
+        if cat_channels == None:
+            cat_channels = in_channels+out_channels
+        self.deconv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2, padding=0)
+        self.conv1 = nn.Conv2d(cat_channels, out_channels, kernel_size=kernel, padding=padding)
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel, padding=padding)
-        self.conv3 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel, padding=padding)
+        self.conv3 = nn.Conv2d(out_channels, out_channels, kernel_size=1, padding=0)
 
         self.bn_deconv = nn.BatchNorm2d(out_channels)
         self.bn1 = nn.BatchNorm2d(out_channels)
@@ -102,14 +92,18 @@ class DRUNet(nn.Module):
                self.down_layer1 = DownSev(in_size, out_size, p=p)
 
             self.down_layers.append(DownSampling(out_size, out_size,p=p))
+
             if layer < n_layers - 1:
                 self.pool_layers.append(nn.MaxPool2d(2))
 
         for layer in range(n_layers - 2, -1, -1):
             out_size = 2 ** (layer + 1) * root_filters
-            self.up_layers.append(UpSampling(out_size*2, out_size))
+            if layer == 3:
+              self.up_layers.append(UpSampling(out_size*2, out_size//2, cat_channels=out_size+out_size//2 ,p=p))
+            else: 
+              self.up_layers.append(UpSampling(out_size, out_size//2, p=p))
 
-        self.conv_out = nn.Conv2d(root_filters*2,1,3,padding=1)
+        self.conv_out = nn.Conv2d(root_filters,1, kernel_size=1,stride=1,padding=0)
         self.relu = nn.ReLU()
 
     def forward(self, input):
