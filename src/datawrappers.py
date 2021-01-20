@@ -111,6 +111,87 @@ class RandomDataset(Dataset):
 
         return torch.tensor(image).float(), torch.tensor(mask)
 
+class ValDataset(Dataset):
+
+    def __init__(self, data_dir, sample_size=(256,256), transform=None, inv=False, preprocess_fn=None):
+
+        self.transform = transform
+        self.inv = inv
+        self.preprocess_fn = preprocess_fn
+        self.sample_size = sample_size
+        self.images, self.masks = self.create_samples(data_dir)
+
+    def __len__(self):
+        return len(self.images)
+
+    def add_border(self, img):
+        old_size = img.size
+
+        new_size = ((int(old_size[0] / self.sample_size[0]) + 1)*self.sample_size[0], 
+                    (int(old_size[1] / self.sample_size[1]) + 1)*self.sample_size[1])
+            
+        new_img = Image.new(img.mode, new_size, 0)
+        new_img.paste(img, (int((new_size[0]-old_size[0])/2),
+                            int((new_size[1]-old_size[1])/2)))
+            
+        return new_img
+
+    def crop_samples(self, img, channel=None):
+        
+        x_samples = img.size[0]//self.sample_size[0]
+        y_samples = img.size[1]//self.sample_size[1]
+
+        samples = []
+        ss = self.sample_size
+        for i in range(x_samples):
+            for j in range(y_samples):
+                sample = np.array(img.crop((i*ss[0], j*ss[0], (i+1)*ss[0], (j+1)*ss[1])))
+                if channel:
+                    sample = sample[:,:,1]
+                samples.append(sample)
+
+        return samples
+
+    def create_samples(self, data_dir):
+
+        img_paths = glob.glob(data_dir+'/images/*.tif')
+        mask_paths = glob.glob(data_dir+'/masks/*.png')
+
+        images, masks = [], []
+        for img_path, mask_path in zip(img_paths, mask_paths):
+            img = Image.open(img_path)
+            mask = Image.open(mask_path)
+
+            if self.inv:
+                img = img.resize((int(img.size[0]/6), int(img.size[1] /6)))
+                mask = mask.resize((int(mask.size[0]/6), int(mask.size[1] /6)))
+                mask = ImageOps.invert(mask)
+
+            img = self.add_border(img)
+            mask = self.add_border(mask)
+
+            img_s = self.crop_samples(img)
+            mask_s = self.crop_samples(mask, channel=2)
+
+            if self.transform: 
+                for i in range(len(img_s)):
+                  sample = self.img_transform(image=np.array(img_s[i]), mask=np.array(mask_s[i]))
+                  img_s[i], mask_s[i] = sample['image'], sample['mask']
+
+            if self.preprocess_fn:
+                img_s = [self.preprocess_fn(img) for img in img_s]
+
+            images.extend(img_s)
+            masks.extend(mask_s)
+
+        return images, masks
+
+    def __getitem__(self, idx):
+        img = self.images[idx]
+        mask = self.masks[idx]
+
+        return img, mask
+    
     
 def create_dataloaders(OTT = True, MOS = False, URBN = False,transforms=None, sample_size = (256,256), prep_fn=None, bs=4, dil=None):
 
