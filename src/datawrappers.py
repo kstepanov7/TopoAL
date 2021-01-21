@@ -203,10 +203,10 @@ class FullDataset(Dataset):
 
         if self.preprocess_fn:
             img = self.preprocess_fn(img.numpy().transpose(1,2,0))
+            img = torch.tensor(img.transpose(2,0,1))
 
         mask[mask > 0] = 1
         mask = mask.reshape(1,mask.shape[1],mask.shape[2])
-        img = torch.tensor(img.transpose(2,0,1))
         return img.float(), mask.float()
 
     
