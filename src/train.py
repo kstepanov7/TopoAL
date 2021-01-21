@@ -81,6 +81,6 @@ def run_epoch_topo(generator, discriminator, optimizer_G, optimizer_D, criterion
           # log stats
           epoch_loss_G += loss_G.detach().cpu().numpy()
           epoch_loss_D += loss_D.detach().cpu().numpy()
-          epoch_metric += metric(pred_g.detach().cpu().numpy(), mask_gt.detach().cpu().numpy())
+          epoch_metric += metric(pred_g.detach().cpu(), mask_gt.detach().cpu())
 
     return epoch_loss_G/len(dataloader), epoch_loss_D/len(dataloader), epoch_metric/len(dataloader)
