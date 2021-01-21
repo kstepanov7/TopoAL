@@ -112,15 +112,17 @@ class RandomDataset(Dataset):
 
         return torch.tensor(image).float(), torch.tensor(mask)
 
-class ValDataset(Dataset):
+class FullDataset(Dataset):
 
-    def __init__(self, data_dir, sample_size=(256,256), transform=None, inv=False, preprocess_fn=None):
+    def __init__(self, data_dir, sample_size=(256,256), transform=None, inv=False, preprocess_fn=None, mask_ext='.tif'):
 
         self.transform = transform
         self.inv = inv
+        if self.inv:
+            mask_ext='.png'
         self.preprocess_fn = preprocess_fn
         self.sample_size = sample_size
-        self.images, self.masks = self.create_samples(data_dir)
+        self.images, self.masks = self.create_samples(data_dir, mask_ext)
 
     def __len__(self):
         return len(self.images)
@@ -151,10 +153,10 @@ class ValDataset(Dataset):
 
         return samples
 
-    def create_samples(self, data_dir):
+    def create_samples(self, data_dir, mask_ext):
 
         img_paths = sorted(glob.glob(data_dir+'/images/*.tif'))
-        mask_paths = sorted(glob.glob(data_dir+'/masks/*.png'))
+        mask_paths = sorted(glob.glob(data_dir+'/masks/*'+mask_ext))
 
         images, masks = [], []
         for img_path, mask_path in zip(img_paths, mask_paths):
@@ -162,12 +164,12 @@ class ValDataset(Dataset):
             mask = Image.open(mask_path)
 
             if self.inv:
-                img = img.resize((int(img.size[0]/6), int(img.size[1] /6)))
-                mask = mask.resize((int(mask.size[0]/6), int(mask.size[1] /6)))
+                img = img.resize((512,512))
+                mask = mask.resize((512,512))
                 mask = ImageOps.invert(mask)
 
-            img = self.add_border(img)
-            mask = self.add_border(mask)
+            #img = self.add_border(img)
+            #mask = self.add_border(mask)
 
             img_s = self.crop_samples(img)
             mask_s = self.crop_samples(mask)
@@ -178,6 +180,7 @@ class ValDataset(Dataset):
         return images, masks
 
     def __getitem__(self, idx):
+
         img = self.images[idx]
         mask = self.masks[idx]
         if len(mask.shape) == 3:
@@ -190,16 +193,21 @@ class ValDataset(Dataset):
             torch.manual_seed(seed)
             np.random.seed(seed)
 
-            sample = self.transform(image=np.array(img), mask=np.array(mask))
-            img, mask = sample['image'], sample['mask']
+            img = self.transform(Image.fromarray(img))
+            seed = 42
+            random.seed(seed)
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+
+            mask = self.transform(Image.fromarray(mask))
 
         if self.preprocess_fn:
-            img = self.preprocess_fn(img)
+            img = self.preprocess_fn(img.numpy().transpose(1,2,0))
 
         mask[mask > 0] = 1
-        img = img.transpose(2,0,1)
-        mask = mask.reshape(1,mask.shape[0],mask.shape[1])
-        return torch.tensor(img).float(), torch.tensor(mask).float()
+        mask = mask.reshape(1,mask.shape[1],mask.shape[2])
+        img = torch.tensor(img.transpose(2,0,1))
+        return img.float(), mask.float()
 
     
     
