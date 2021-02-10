@@ -11,44 +11,34 @@ import torch
 from torch import nn
 from TopoAL.src.DiscriminatorLabels import generate_labels
 
-class ResConv2d(nn.Module):
-
-    def __init__(self, in_channels, out_channels, kernel_size, leaky_alpha=0.02):
-        super(ResConv2d, self).__init__()
-        self.padding = (kernel_size[0] // 2, kernel_size[1] // 2)
-        self.layer_block  = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size, padding=self.padding),
-                                          nn.LeakyReLU(leaky_alpha, inplace=False))
-
-    def forward(self, x):
-        return self.layer_block(x)
-
-class ResBlock(nn.Module):
-
-    def __init__(self, n_filters, num_layers=1, leaky_alpha=0.02):
-        super(ResBlock, self).__init__()
-
-        self.kernel_sizes = [(3,1) for i in range(num_layers)]
-        layers = [ResConv2d(n_filters, n_filters, self.kernel_sizes[i], leaky_alpha) for i in range(num_layers)]
-        self.res_block = nn.Sequential(*layers)
-    
-    def forward(self, input):
-      
-        out = self.res_block(input)
-        out += input
-
-        return out
-
 class DiscriminatorBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, num_layers=1):
+    def __init__(self, in_channels, out_channels, bn=True):
         super(DiscriminatorBlock, self).__init__()
 
-        self.conv_strided = nn.Conv2d(in_channels, out_channels, kernel_size=(3,1), stride=2, padding=(1,0))
-        self.ResBlock = ResBlock(out_channels,num_layers=num_layers)
+        self.conv_strided = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1)
+
+        if bn:
+          self.res_block = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels)) 
+        else:
+          self.res_block = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1)) 
+        
+        self.relu = nn.ReLU()
 
     def forward(self, input):
 
-        out = self.conv_strided(input)
-        out = self.ResBlock(out)
+        residual = self.conv_strided(input)
+        out = self.res_block(residual)
+        out += residual
+        out = self.relu(out)
+
 
         return out
 
@@ -58,26 +48,29 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
 
         
-        self.stage_1 = nn.Sequential(DiscriminatorBlock(in_channels, cn, num_layers=num_layers),
-                                    DiscriminatorBlock(cn, cn*2, num_layers=num_layers),
-                                    DiscriminatorBlock(cn*2, cn*4, num_layers=num_layers),
-                                    DiscriminatorBlock(cn*4, cn*8, num_layers=num_layers),
-                                    DiscriminatorBlock(cn*8, cn*8, num_layers=num_layers))
-        self.conv_1 = nn.Conv2d(cn*8, 1, kernel_size=(1,1))
+        self.stage_1 = nn.Sequential(DiscriminatorBlock(in_channels, cn),
+                                    DiscriminatorBlock(cn, cn*2),
+                                    DiscriminatorBlock(cn*2, cn*4),
+                                    DiscriminatorBlock(cn*4, cn*8),
+                                    DiscriminatorBlock(cn*8, cn*16),
+                                    DiscriminatorBlock(cn*16, cn*16))
+        
+        self.conv_1 = nn.Conv2d(cn*16, 1, kernel_size=(1,1))
 
-        self.stage_2 = DiscriminatorBlock(cn*8, cn*8, num_layers=num_layers)
-        self.conv_2 = nn.Conv2d(cn*8, 1, kernel_size=(1,1))
+        self.stage_2 = DiscriminatorBlock(cn*16, cn*16)
+        self.conv_2 = nn.Conv2d(cn*16, 1, kernel_size=(1,1))
 
-        self.stage_3 = DiscriminatorBlock(cn*8, cn*8, num_layers=num_layers)
-        self.conv_3 = nn.Conv2d(cn*8, 1, kernel_size=(1,1))
+        self.stage_3 = DiscriminatorBlock(cn*16, cn*16)
+        self.conv_3 = nn.Conv2d(cn*16, 1, kernel_size=(1,1))
 
-        self.stage_4 = DiscriminatorBlock(cn*8, cn*8, num_layers=num_layers)
-        self.conv_4 = nn.Conv2d(cn*8, 1, kernel_size=(1,1))
+        self.stage_4 = DiscriminatorBlock(cn*16, cn*16, bn=False)
+        self.conv_4 = nn.Conv2d(cn*16, 1, kernel_size=(1,1))
 
 
-    def assign_labels(self, mask_gt, mask_p, sigma=0.5, tr=0.5):
+    def assign_labels(self, mask_gt, mask_p, sigma=0.5, tr=1):
 
         bs = mask_p.shape[0]
+
         labels1 = torch.rand((bs,1,8,8))
         labels2 = torch.rand((bs,1,4,4))
         labels3 = torch.rand((bs,1,2,2))
@@ -97,7 +90,6 @@ class Discriminator(nn.Module):
     def forward(self, input):
         
         out = self.stage_1(input)
-
         out_1 = self.conv_1(out)
 
         out = self.stage_2(out)
@@ -110,3 +102,27 @@ class Discriminator(nn.Module):
         out_4 = self.conv_4(out)
 
         return [out_1.sigmoid(), out_2.sigmoid(), out_3.sigmoid(), out_4.sigmoid()]
+
+def generate_labels(mask_gt, mask_p, sigma=0.5, tr=1):
+
+    '''
+    Generate labels for discriminator input
+    '''
+    
+    gt_dil = binary_dilation(mask_gt,selem=star(1))
+    skel_gt = make_skeleton(mask_gt, sigma=sigma, tr=tr)
+    T_0 = gt_dil * mask_p
+
+    labels0 = torch.zeros((8,8))
+    for i in range(8):
+        for j in range(8):
+            prop_patch = T_0[i*64:(i+1)*64, j*64:(j+1)*64]
+            patch = np.array(skel_gt[i*64:(i+1)*64, j*64:(j+1)*64], dtype=np.uint8)
+            paths = find_paths(patch)
+            labels0[i,j] = assing_label(prop_patch, paths)
+
+    labels = [labels0]
+    for i in range(3):
+        labels.append(generate_sublabels(labels[-1]))
+
+    return labels
